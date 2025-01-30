@@ -1,3 +1,3 @@
-web: node todolists/server.js
+web: node server.js
 
 

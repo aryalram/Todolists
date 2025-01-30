@@ -2,81 +2,71 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const path = require('path');
+require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Database connection
-const mysqlConnection = mysql.createConnection({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'ram2024',
-  database: process.env.DB_NAME || 'employeedb',
-});
+// ✅ Use CORS middleware with explicit allowed origin
+app.use(cors({
+  origin: 'https://task-manager-frontend-0d20f4b6eb5d.herokuapp.com', // Change this to match your frontend URL
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type'],
+  credentials: true, // ✅ Allow cookies if needed
+}));
 
-// Connect to database
-mysqlConnection.connect((err) => {
-  if (err) {
-    console.error('Error connecting to the database:', err);
-    return;
-  }
-  console.log('Connected to the MySQL database.');
-});
-
-// Enable CORS
-app.use(cors()); // Allow frontend requests from different port (Vite on 5074)
 app.use(express.json());
 
-// Routes for API (fetch, insert, update, delete tasks)
+// Database connection
+const db = mysql.createPool({
+  host: process.env.DB_HOST || 'z37udk8g6jiaqcbx.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
+  user: process.env.DB_USER || 'l3fkx4cvrwa380n9',
+  password: process.env.DB_PASSWORD || 'u0rhu9z86kdyw36w',
+  database: process.env.DB_NAME || 'vqsxratnr25ldeep',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+});
+
+// Check database connection
+db.getConnection((err, connection) => {
+  if (err) {
+    console.error('Database connection error:', err.message);
+  } else {
+    console.log('Connected to MySQL database.');
+    connection.release();
+  }
+});
+
+// ✅ Manually Set CORS Headers for All Responses
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'https://task-manager-frontend-0d20f4b6eb5d.herokuapp.com');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
+
+// Routes
 app.get('/api/tasks', (req, res) => {
-  const query = 'SELECT * FROM TASKS';
-  mysqlConnection.query(query, (err, results) => {
-    if (err) {
-      return res.status(500).send('Error fetching data');
-    }
+  db.query('SELECT * FROM TASKS', (err, results) => {
+    if (err) return res.status(500).json({ error: 'Error fetching tasks' });
     res.json(results);
   });
 });
 
 app.post('/api/tasks', (req, res) => {
   const { text, date } = req.body;
-  const query = 'INSERT INTO TASKS (text, date) VALUES (?, ?)';
-  mysqlConnection.query(query, [text, date], (err, results) => {
-    if (err) {
-      return res.status(500).send('Error inserting data');
-    }
+  if (!text || !date) return res.status(400).json({ error: 'Text and date required' });
+  db.query('INSERT INTO TASKS (text, date) VALUES (?, ?)', [text, date], (err, results) => {
+    if (err) return res.status(500).json({ error: 'Error inserting task' });
     res.status(201).json({ message: 'Task added successfully', id: results.insertId });
   });
 });
 
-app.put('/api/tasks/:id', (req, res) => {
-  const { id } = req.params;
-  const { text, date } = req.body;
-  const query = 'UPDATE TASKS SET text = ?, date = ? WHERE id = ?';
-  mysqlConnection.query(query, [text, date, id], (err, result) => {
-    if (err) {
-      return res.status(500).send('Error updating task');
-    }
-    res.json({ message: 'Task updated successfully' });
-  });
-});
-
-app.delete('/api/tasks/:id', (req, res) => {
-  const { id } = req.params;
-  const query = 'DELETE FROM TASKS WHERE id = ?';
-  mysqlConnection.query(query, [id], (err, result) => {
-    if (err) {
-      return res.status(500).send('Error deleting task');
-    }
-    res.json({ message: 'Task deleted successfully' });
-  });
-});
-
-// Serve static files from React app in production
+// Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, 'build')));
-
-  // Any route not handled by the API, return the React app's index.html
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'build', 'index.html'));
   });
