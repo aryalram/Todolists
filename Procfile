@@ -1,2 +1,3 @@
-web: serve -s build
+web: node todolists/server.js
+
 
