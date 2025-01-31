@@ -49,7 +49,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.get('/api/tasks', (req, res) => {
-  db.query('SELECT * FROM TASKS', (err, results) => {
+  db.query('SELECT * FROM tasks', (err, results) => {
     if (err) return res.status(500).json({ error: 'Error fetching tasks' });
     res.json(results);
   });
