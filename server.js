@@ -1,76 +1,77 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
-const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const port = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5000;
 
-// ✅ Use CORS middleware with explicit allowed origin
+// Middleware
 app.use(cors({
-  origin: 'https://task-manager-frontend-0d20f4b6eb5d.herokuapp.com', // Change this to match your frontend URL
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type'],
-  credentials: true, // ✅ Allow cookies if needed
+  origin: 'http://localhost:5173', // Allow requests from your frontend Vite server
 }));
-
 app.use(express.json());
 
-// Database connection
-const db = mysql.createPool({
-  host: process.env.DB_HOST || 'z37udk8g6jiaqcbx.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
-  user: process.env.DB_USER || 'l3fkx4cvrwa380n9',
-  password: process.env.DB_PASSWORD || 'u0rhu9z86kdyw36w',
-  database: process.env.DB_NAME || 'vqsxratnr25ldeep',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+// MySQL connection string
+const connectionString = process.env.MYSQL_CONNECTION_STRING || 'mysql://wgqsalk87orb294u:ngzcw52ntfvam6vc@sp6xl8zoyvbumaa2.cbetxkdyhwsb.us-east-1.rds.amazonaws.com:3306/wb2waxj39e4tgewo';
 
-// Check database connection
-db.getConnection((err, connection) => {
+// Create MySQL connection
+const db = mysql.createConnection(connectionString);
+
+// Connect to MySQL
+db.connect((err) => {
   if (err) {
-    console.error('Database connection error:', err.message);
+    console.error('Error connecting to MySQL:', err);
   } else {
-    console.log('Connected to MySQL database.');
-    connection.release();
+    console.log('Connected to MySQL');
   }
 });
 
-// ✅ Manually Set CORS Headers for All Responses
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://task-manager-frontend-0d20f4b6eb5d.herokuapp.com');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  next();
-});
-
 // Routes
+
+// Get all tasks
 app.get('/api/tasks', (req, res) => {
-  db.query('SELECT * FROM tasks', (err, results) => {
-    if (err) return res.status(500).json({ error: 'Error fetching tasks' });
-    res.json(results);
+  db.query('SELECT * FROM TASKS', (err, results) => {
+    if (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to fetch tasks' });
+    } else {
+      res.json(results);
+    }
   });
 });
 
+// Add a new task
 app.post('/api/tasks', (req, res) => {
   const { text, date } = req.body;
-  if (!text || !date) return res.status(400).json({ error: 'Text and date required' });
-  db.query('INSERT INTO TASKS (text, date) VALUES (?, ?)', [text, date], (err, results) => {
-    if (err) return res.status(500).json({ error: 'Error inserting task' });
-    res.status(201).json({ message: 'Task added successfully', id: results.insertId });
+  if (!text || !date) {
+    return res.status(400).json({ error: 'Text and date are required' });
+  }
+  const query = `INSERT INTO tasks (text, date) VALUES (?, ?)`;
+  db.query(query, [text, date], (err, result) => {
+    if (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to add task' });
+    } else {
+      res.json({ message: 'Task added successfully' });
+    }
   });
 });
 
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'build')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'build', 'index.html'));
+// Delete a task
+app.delete('/api/tasks/:id', (req, res) => {
+  const { id } = req.params;
+  db.query('DELETE FROM tasks WHERE id = ?', [id], (err, result) => {
+    if (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to delete task' });
+    } else {
+      res.json({ message: 'Task deleted successfully' });
+    }
   });
-}
+});
 
 // Start server
-app.listen(port, () => console.log(`Server running on port ${port}`));
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
